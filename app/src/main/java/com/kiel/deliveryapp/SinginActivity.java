@@ -1,16 +1,20 @@
 package com.kiel.deliveryapp;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.content.res.Resources;
-import android.graphics.Color;
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.FirebaseNetworkException;
@@ -18,7 +22,16 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 import com.kiel.deliveryapp.databinding.ActivitySinginBinding;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
@@ -31,6 +44,10 @@ public class SinginActivity extends AppCompatActivity {
     private Button btSelectPic, btRegister;
     private EditText editName, editEmail, editPassword;
     private TextView txtErrorMessage;
+
+    private String userID;
+
+    private Uri mSelectUri;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +65,64 @@ public class SinginActivity extends AppCompatActivity {
 
         btRegister.setOnClickListener(this::userRegister);
 
+        btSelectPic.setOnClickListener(this::selectPictureGallery);
+    }
+
+    ActivityResultLauncher<Intent> activityResultLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    Intent data = result.getData();
+                    assert data != null;
+                    mSelectUri = data.getData();
+
+                    try {
+                        userPic.setImageURI(mSelectUri);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+    );
+
+    public void selectPictureGallery(View view) {
+
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        activityResultLauncher.launch(intent);
+    }
+
+    private void saveUserData() {
+        String fileName = UUID.randomUUID().toString();
+
+        final StorageReference reference = FirebaseStorage.getInstance().getReference("/images/" + fileName);
+
+        reference.putFile(mSelectUri)
+                .addOnSuccessListener(taskSnapshot -> reference.getDownloadUrl().addOnSuccessListener(uri -> {
+                    String pic = uri.toString();
+
+                    // Start firestore database
+                    String name = editName.getText().toString();
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+                    Map<String, Object> users = new HashMap<>();
+                    users.put("name", name);
+                    users.put("user_pic", pic);
+
+                    userID = Objects.requireNonNull(auth.getCurrentUser()).getUid();
+
+                    DocumentReference documentReference = db.collection("Users").document(userID);
+                    documentReference.set(users)
+                            .addOnSuccessListener(unused -> Log.i("db", "Sucesso ao salvar os dados"))
+                            .addOnFailureListener(e -> Log.i("db", "Erro ao salvar os dados" + e));
+
+
+                }).addOnFailureListener(e -> {
+
+                }))
+                .addOnFailureListener(e -> {
+
+                });
     }
 
     public void startComponents() {
@@ -67,6 +142,7 @@ public class SinginActivity extends AppCompatActivity {
 
         auth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
+                saveUserData();
                 Snackbar snackbar = Snackbar.make(v, "Cadastro realizado com sucesso", Snackbar.LENGTH_INDEFINITE)
                         .setAction("OK", v1 -> finish());
                 snackbar.show();
@@ -74,7 +150,7 @@ public class SinginActivity extends AppCompatActivity {
                 String error;
 
                 try {
-                    throw task.getException();
+                    throw Objects.requireNonNull(task.getException());
                 } catch (FirebaseAuthWeakPasswordException e) {
                     error = "Digite uma senha com no mínimo 6 caracteres";
                 } catch (FirebaseAuthInvalidCredentialsException e) {
