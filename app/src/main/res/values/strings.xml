@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Delivery App</string>
+
+    <string name="login_txt_login">Login</string>
+    <string name="login_txt_register">Cadastre-se aqui</string>
+    <string name="login_txt_error_msg">Preencha todos os campos</string>
+
+    <string name="txt_email">Email</string>
+    <string name="txt_password">Senha</string>
+
+    <string name="logo_description">Logo do App contendo um prato com talher</string>
 </resources>
