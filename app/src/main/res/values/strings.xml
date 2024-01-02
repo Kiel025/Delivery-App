@@ -9,4 +9,8 @@
     <string name="txt_password">Senha</string>
 
     <string name="logo_description">Logo do App contendo um prato com talher</string>
+
+    <string name="menu_profile">Perfil</string>
+    <string name="menu_orders">Pedidos</string>
+    <string name="menu_logout">Sair da sessão</string>
 </resources>
